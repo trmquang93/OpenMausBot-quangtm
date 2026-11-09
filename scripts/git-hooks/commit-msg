@@ -1,0 +1,18 @@
+#!/bin/sh
+# Rejects Claude Code attribution footers, which never belong in these repos.
+# Quang, 2026-11-10.
+msg_file="$1"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+  exit 0
+fi
+
+bad=$(grep -Ein '^[[:space:]]*Co-Authored-By:[[:space:]]*Claude|Generated with \[Claude Code\]|Generated with Claude Code' "$msg_file")
+
+if [ -n "$bad" ]; then
+  echo "commit-msg: Claude Code attribution footer is not allowed." >&2
+  echo "$bad" | sed 's/^/  line /' >&2
+  echo "Remove the Co-Authored-By / Generated with [Claude Code] line and commit again." >&2
+  exit 1
+fi
+
+exit 0
