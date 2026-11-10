@@ -447,6 +447,7 @@ describe("a person's terminal card", () => {
     const f = await fixture();
     const opened = (await f.call(DIRECT, "open", { title: "Dev server", cwd: "app", cols: 100, rows: 30 })).payload;
     const oldId = opened.session_id as string;
+    f.ptys[0]!.print("PRIVATE_OUTPUT\r\n");
     expect((await f.http("POST", `/api/threads/thread-1/terminal/${oldId}/restart`)).status).toBe(409);
     f.ptys[0]!.end(0);
     const restarted = await f.http("POST", `/api/threads/thread-1/terminal/${oldId}/restart`);
@@ -454,8 +455,28 @@ describe("a person's terminal card", () => {
     const terminal = restarted.body.terminal as TerminalPayload;
     expect(terminal).toMatchObject({ title: "Dev server", cwd: join(f.root, "app"), cols: 100, rows: 30, state: "running" });
     expect(terminal.sessionId).not.toBe(oldId);
+    expect(Object.keys(restarted.body)).toEqual(["terminal"]);
+    expect(Object.keys(terminal).sort()).toEqual(["cols", "cwd", "rows", "sessionId", "state", "title"]);
+    expect(JSON.stringify(restarted.body)).not.toContain("PRIVATE_OUTPUT");
     expect(f.state.rows).toHaveLength(1);
     expect(f.state.rows[0]!.terminal.sessionId).toBe(terminal.sessionId);
+    expect(f.ptys).toHaveLength(2);
+  });
+
+  it("will not start again for a person who only sees the conversation, and spawns nothing", async () => {
+    const f = await fixture();
+    const id = (await f.call(DIRECT, "open")).payload.session_id as string;
+    f.ptys[0]!.end(0);
+    f.state.owner = false;
+    const refused = await f.http("POST", `/api/threads/thread-1/terminal/${id}/restart`);
+    expect(refused.status).toBe(403);
+    expect(refused.body).toEqual({ error: TERMINAL_MESSAGES.notOwner });
+    expect(f.ptys).toHaveLength(1);
+    expect(f.state.rows).toHaveLength(1);
+    expect(f.state.rows[0]!.terminal.sessionId).toBe(id);
+    expect((await f.call(DIRECT, "list")).payload.sessions).toEqual([expect.objectContaining({ session_id: id, state: "exited" })]);
+    f.state.owner = true;
+    expect((await f.http("POST", `/api/threads/thread-1/terminal/${id}/restart`)).status).toBe(200);
     expect(f.ptys).toHaveLength(2);
   });
 

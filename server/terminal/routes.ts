@@ -270,6 +270,7 @@ export function createTerminalHost(deps: TerminalHostDeps): TerminalHost {
     }
 
     if (method !== "POST") return void json(res, 405, { error: "method not allowed" });
+    if (!deps.canWrite(auth, threadId)) return void json(res, 403, { error: TERMINAL_MESSAGES.notOwner });
     const botId = deps.directBot(threadId);
     if (!botId) return void json(res, 403, { error: TERMINAL_MESSAGES.room });
     const blocked = refusal(botId, threadId, true);
