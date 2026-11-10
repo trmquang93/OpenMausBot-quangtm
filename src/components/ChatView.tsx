@@ -76,6 +76,7 @@ import { DataResultChip } from "./DataResultChip"; import { PublishedPageCard } 
 import { ThreadRefText } from "./ThreadRefs"; import { WatchScreenButton } from "./WatchScreenButton";
 import { optionsCardRow } from "./OptionsCardRow";
 import { MessageBoundary } from "./MessageBoundary";
+import { TerminalCard } from "./terminal/TerminalCard";
 import { RichMessageRow, UserLineNote, richRowKind } from "./RichMessageRow"; import { SetupOffer } from "./SetupOffer"; import { SavedStepsChip } from "./SavedStepsChip";
 import { Composer } from "./Composer";
 import { ChatErrorBanner, ChatNotice } from "./ChatErrorBanner";
@@ -740,6 +741,8 @@ const MessagesList = memo(function MessagesList({
             case "widget":
             case "app":
               return <RichMessageRow botId={botId} botName={botName} threadId={threadId} message={m} />;
+            case "terminal":
+              return <MessageBoundary fallbackText={m.text ?? ""}><TerminalCard botId={botId} botName={botName} threadId={threadId} message={m} /></MessageBoundary>;
             case "routine.run":
               return <RoutineRunRow message={m} botId={botId} />;
             case "call":

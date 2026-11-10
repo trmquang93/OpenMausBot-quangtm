@@ -14,6 +14,7 @@ export function richRowKind(message: Message): Message["kind"] {
   if (message.setupSuggestion || (message.kind === "goal.run" && message.goalRun)) return "widget";
   if (message.kind === "widget" && !message.widget) return "text";
   if (message.kind === "app" && !message.app) return "text";
+  if (message.kind === "terminal" && !message.terminal) return "text";
   return message.kind;
 }
 
