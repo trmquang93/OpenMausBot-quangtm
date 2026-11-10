@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type { Terminal } from "@xterm/xterm";
+import { copyText } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
 import {
   TERMINAL_CLOSE,
@@ -95,7 +96,7 @@ export function TerminalView(props: TerminalViewProps) {
   useImperativeHandle(props.handle, () => ({
     async copyAll() {
       const term = termRef.current;
-      if (term) await navigator.clipboard.writeText(terminalText(term));
+      if (term && await copyText(terminalText(term)) === "failed") throw new Error("copy failed");
     },
     stop() {
       const socket = socketRef.current;
@@ -122,7 +123,7 @@ export function TerminalView(props: TerminalViewProps) {
         rows: latest.current.rows,
         scrollback: SCROLLBACK_LINES,
         cursorBlink: true,
-        fontSize: 12.5,
+        fontSize: 13,
         fontFamily: terminalFontFamily(element),
         theme: readTerminalTheme(element),
         linkHandler: { activate: (_event, uri) => { openTerminalLink(uri); }, allowNonHttpProtocols: false },
@@ -145,7 +146,7 @@ export function TerminalView(props: TerminalViewProps) {
         const key = event.key.toLowerCase();
         if (modified && key === "c") {
           if (term.hasSelection()) {
-            void navigator.clipboard.writeText(term.getSelection()).catch(() => {});
+            void copyText(term.getSelection());
             term.clearSelection();
             return false;
           }

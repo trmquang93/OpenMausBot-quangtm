@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Check, Copy, Maximize2, Minimize2, Play, Square } from "lucide-react";
 import { api, type Message } from "@/state/store";
+import { copyText } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 import { terminalRestartPath, type TerminalPayload } from "../../../shared/terminal";
@@ -95,7 +96,7 @@ function TerminalCardBody({ threadId, messageId, payload, pool }: { threadId?: s
   const copyAll = async () => {
     try {
       if (view.current) await view.current.copyAll();
-      else await navigator.clipboard.writeText(text);
+      else if (await copyText(text) === "failed") throw new Error("copy failed");
       setCopied(true);
       setTimeout(() => setCopied(false), 1_500);
     } catch {

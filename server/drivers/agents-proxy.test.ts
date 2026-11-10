@@ -654,6 +654,13 @@ describe("agents-proxy MCP surface", () => {
       "show_html",
       "publish_page",
       "unpublish_page",
+      "terminal_open",
+      "terminal_write",
+      "terminal_key",
+      "terminal_read",
+      "terminal_wait",
+      "terminal_close",
+      "terminal_list",
       "post_to_room",
       "create_bot",
       "list_team_setup",
@@ -766,7 +773,7 @@ describe("agents-proxy MCP surface", () => {
       "tool_result_read",
       "list_shared_computers",
       "assignment_status", "list_bots", "usage_limits", "list_rooms", "list_threads",
-      "list_models", "list_team_setup",
+      "list_models", "terminal_read", "terminal_wait", "terminal_list", "list_team_setup",
       "session_search", "trigger_info", "list_waits", "skills_list",
     ];
     expect(list.result.tools.filter((tool: any) => tool.annotations?.readOnlyHint)

@@ -6,6 +6,7 @@ import { BugReportNote } from "./BugReportNote";
 import { GoalRunRow } from "./GoalRunCard";
 import { HelperKeySuggestion } from "./HelperKeySuggestion";
 import { MessageBoundary } from "./MessageBoundary";
+import { TerminalCard } from "./terminal/TerminalCard";
 import { WidgetMessage } from "./widget/WidgetMessage";
 
 export function richRowKind(message: Message): Message["kind"] {
@@ -28,7 +29,9 @@ export function RichMessageRow({ botId, botName, threadId, message, room }: { bo
           ? <GoalRunRow botId={botId} threadId={threadId} message={message} />
           : message.kind === "app"
             ? <AppMessage botId={botId} botName={botName} threadId={threadId} message={message} room={room} />
-            : <WidgetMessage botId={botId} threadId={threadId} message={message} viewOnly={room} />}
+            : message.kind === "terminal"
+              ? <TerminalCard botId={botId} botName={botName} threadId={threadId} message={message} />
+              : <WidgetMessage botId={botId} threadId={threadId} message={message} viewOnly={room} />}
     </MessageBoundary>
   );
 }

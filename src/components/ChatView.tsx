@@ -76,7 +76,6 @@ import { DataResultChip } from "./DataResultChip"; import { PublishedPageCard } 
 import { ThreadRefText } from "./ThreadRefs"; import { WatchScreenButton } from "./WatchScreenButton";
 import { optionsCardRow } from "./OptionsCardRow";
 import { MessageBoundary } from "./MessageBoundary";
-import { TerminalCard } from "./terminal/TerminalCard";
 import { RichMessageRow, UserLineNote, richRowKind } from "./RichMessageRow"; import { SetupOffer } from "./SetupOffer"; import { SavedStepsChip } from "./SavedStepsChip";
 import { Composer } from "./Composer";
 import { ChatErrorBanner, ChatNotice } from "./ChatErrorBanner";
@@ -738,11 +737,8 @@ const MessagesList = memo(function MessagesList({
               return m.connector ? <ConnectorCard botId={botId} color={botColor} threadId={threadId} message={m} /> : null;
             case "options":
               return optionsCardRow({ message: m, transcript, botId, botName, botColor: bots.find((one) => one.id === m.inbox?.from.botId)?.color ?? botColor, threadId, asker: bots.find((one) => one.id === (m.inbox?.from.botId ?? botId)) });
-            case "widget":
-            case "app":
+            case "widget": case "app": case "terminal":
               return <RichMessageRow botId={botId} botName={botName} threadId={threadId} message={m} />;
-            case "terminal":
-              return <MessageBoundary fallbackText={m.text ?? ""}><TerminalCard botId={botId} botName={botName} threadId={threadId} message={m} /></MessageBoundary>;
             case "routine.run":
               return <RoutineRunRow message={m} botId={botId} />;
             case "call":
