@@ -38,10 +38,10 @@ export function terminalDeps(w: TerminalWiring): TerminalHostDeps {
     },
     canSee: (auth, threadId) => w.visibleTo(w.viewerFor(auth)).thread(threadId),
     canWrite: (auth, threadId) => {
-      if (ownerOrAdmin(auth)) return true;
+      if (auth.kind === "loopback") return ownerOrAdmin(auth);
       const bot = store.botByThread(threadId);
       const owner = bot ? botOwner(bot) : null;
-      return auth.kind === "session" && owner !== null && owner === auth.session.email?.trim().toLowerCase();
+      return owner === null ? auth.scopes.includes("admin") : owner === auth.session.email?.trim().toLowerCase();
     },
     live: (auth) => auth.kind === "loopback" || w.sessions.isLive(auth.session.id),
     threadLive: (botId, threadId) => {

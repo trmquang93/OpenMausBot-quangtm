@@ -13,10 +13,15 @@ function canWrite(auth: RequestAuth, bot: { createdBy?: string } | undefined) {
 }
 
 describe("who may type into a terminal", () => {
-  it("lets the person on a single-user install, and an admin, write", () => {
+  it("lets the person on a single-user install, and an admin where no one owns the bot, write", () => {
     expect(canWrite(loopback(), { createdBy: "owner@example.com" })).toBe(true);
     expect(canWrite(loopback(), undefined)).toBe(true);
-    expect(canWrite(session("boss@example.com", true), { createdBy: "owner@example.com" })).toBe(true);
+    expect(canWrite(session("boss@example.com", true), { })).toBe(true);
+  });
+
+  it("keeps an admin out of a terminal in a conversation of a bot someone else owns", () => {
+    expect(canWrite(session("boss@example.com", true), { createdBy: "owner@example.com" })).toBe(false);
+    expect(canWrite(session("owner@example.com", true), { createdBy: "owner@example.com" })).toBe(true);
   });
 
   it("lets a member write only in their own bot's conversation", () => {
