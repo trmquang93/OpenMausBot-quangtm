@@ -54,6 +54,8 @@ export interface ConfigStatus {
   /** Per-call ceiling (minutes) for a bot's MCP tools. Absent from servers
    * older than the setting; read it with mcpCallTimeoutMinutes(). */
   mcp?: { callTimeoutMinutes: number };
+  /** Terminal limits and the command-finished marker; absent from servers older than the built-in terminal. */
+  terminal?: { maxPerThread: number; maxTotal: number; shellIntegration: boolean };
   /** Workspace defaults for new bots; absent effort = no level is sent. */
   newBots?: { effort?: EffortLevel };
   /** This Cloud is on the Starter plan, as the Admin last said; absent or false otherwise. */
