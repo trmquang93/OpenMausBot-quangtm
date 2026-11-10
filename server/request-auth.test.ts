@@ -406,11 +406,13 @@ describe("resolveRequestAuth", () => {
     expect(connectorRefresh.auth).toBeNull();
     expect(connectorRefresh.status).toBe(403);
     for (const path of ["/api/desktop-viewer/vps/bot-1", "/api/desktop-viewer/local/shared/websockify", "/api/webhooks/hook-1/address", "/api/setup-import/grok",
-      "/api/local-computer", "/api/bots/bot-1/local-computer"]) {
+      "/api/local-computer", "/api/bots/bot-1/local-computer", "/api/threads/thread-1/terminal/session-1", "/api/threads/thread-1/terminal/session-1/restart"]) {
       expect(resolveRequestAuth(request({ host: "127.0.0.1:8799" }, "GET"), options(path)).status, path).toBe(403);
       expect(resolveRequestAuth(request({ host: "127.0.0.1:8799", "x-openmausbot-desktop-owner": "owner-token-123" }, "GET"), options(path)).auth?.kind, path)
         .toBe("loopback");
     }
+    expect(requiredScope("GET", "/api/threads/thread-1/terminal/session-1")).toBe("admin");
+    expect(requiredScope("POST", "/api/threads/thread-1/terminal/session-1/restart")).toBe("admin");
     for (const path of ["/api/webhooks", "/api/local-computer/instances", "/api/bots/bot-1/local-computer/screenshot"]) {
       expect(resolveRequestAuth(request({ host: "127.0.0.1:8799" }, "GET"), options(path)).auth?.kind, path).toBe("loopback");
     }
