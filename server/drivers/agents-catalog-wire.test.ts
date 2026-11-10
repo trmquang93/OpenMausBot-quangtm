@@ -11,6 +11,7 @@ import { build } from "esbuild";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { waitForExit } from "../testing/cleanup.ts";
 import { availableTools, catalogProfileFromEnv } from "./agents-catalog.ts";
+import { TERMINAL_TOOL_NAMES } from "./agents-terminal-tools.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PROXY_SOURCE = join(HERE, "agents-proxy.ts");
@@ -83,35 +84,35 @@ const FULL = "skills+shared+voice+escalations+x+team+images";
 
 /** Bytes when the budget was last set; a profile may move at most 2% either way (lower it to lock in a win). */
 const BUDGET_BASELINE: Record<string, number> = {
-  "default": 60451,
-  "voice": 61232,
-  "shared": 62716,
-  "shared+voice": 63497,
-  "skills": 63527,
-  "skills+voice": 64308,
-  "skills+shared": 65792,
-  "skills+shared+voice": 66573,
-  "non-chief": 51235,
-  "voice+non-chief": 52016,
-  "shared+non-chief": 53500,
-  "shared+voice+non-chief": 54281,
-  "skills+non-chief": 54311,
-  "skills+voice+non-chief": 55092,
-  "skills+shared+non-chief": 56576,
-  "skills+shared+voice+non-chief": 57357,
-  "skills+shared+voice+cloud-home": 66339,
-  "skills+shared+voice+non-chief+cloud-home": 57123,
-  "default+legacy-switches": 60451,
-  "default+mausbot": 61102,
-  "skills+shared+voice+mausbot": 67224,
-  "skills+shared+voice+escalations": 67403,
-  "skills+shared+voice+escalations+x": 71242,
-  "skills+shared+voice+escalations+x+team": 71242,
-  "default+no-computer-pick": 59239,
+  "default": 63591,
+  "voice": 64372,
+  "shared": 65856,
+  "shared+voice": 66637,
+  "skills": 66667,
+  "skills+voice": 67448,
+  "skills+shared": 68932,
+  "skills+shared+voice": 69713,
+  "non-chief": 54375,
+  "voice+non-chief": 55156,
+  "shared+non-chief": 56640,
+  "shared+voice+non-chief": 57421,
+  "skills+non-chief": 57451,
+  "skills+voice+non-chief": 58232,
+  "skills+shared+non-chief": 59716,
+  "skills+shared+voice+non-chief": 60497,
+  "skills+shared+voice+cloud-home": 69479,
+  "skills+shared+voice+non-chief+cloud-home": 60263,
+  "default+legacy-switches": 63591,
+  "default+mausbot": 64242,
+  "skills+shared+voice+mausbot": 70364,
+  "skills+shared+voice+escalations": 70543,
+  "skills+shared+voice+escalations+x": 74382,
+  "skills+shared+voice+escalations+x+team": 74382,
+  "default+no-computer-pick": 62379,
   "default+room": 57595,
   "non-chief+room": 48379,
-  "skills+shared+voice+escalations+x+team+images": 72015,
-  "default+images": 61224,
+  "skills+shared+voice+escalations+x+team+images": 75155,
+  "default+images": 64364,
 };
 
 const RPC_PREFIX = '{"jsonrpc":"2.0","id":1,"result":';
@@ -200,7 +201,7 @@ describe("agents proxy tools/list golden", () => {
       expect(at, name).toBeGreaterThan(-1);
       const waits = PROFILES[name]!.env.OMB_ROOM === "1" ? [] : ["wait_until", "list_waits", "cancel_wait"];
       expect(names.slice(at + 1, at + 1 + waits.length), name).toEqual(waits);
-      expect(names.filter((tool) => /wait/.test(tool) && tool !== "assignment_status"), name).toEqual(waits);
+      expect(names.filter((tool) => /wait/.test(tool) && tool !== "assignment_status" && tool !== "terminal_wait"), name).toEqual(waits);
     }
   });
 
@@ -335,7 +336,7 @@ describe("agents proxy tools/list golden", () => {
     const names = (name: string) => toolsOf(wires[name]!).map((tool) => tool.name);
     expect(names("default+no-computer-pick")).toEqual(names("default").filter((tool) => tool !== "select_computer"));
     for (const name of ["default", "non-chief"]) {
-      expect(names(`${name}+room`), name).toEqual(names(name).filter((tool) => !["select_computer", "wait_until", "list_waits", "cancel_wait"].includes(tool)));
+      expect(names(`${name}+room`), name).toEqual(names(name).filter((tool) => !["select_computer", "wait_until", "list_waits", "cancel_wait", ...TERMINAL_TOOL_NAMES].includes(tool)));
     }
     for (const [name, profile] of Object.entries(PROFILES)) {
       expect(names(name).includes("select_computer"), name).toBe(profile.env.OMB_COMPUTER_SELECTION === "1");

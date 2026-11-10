@@ -132,6 +132,10 @@ mac:
     # node_modules entry of any tree it copies (app-builder-lib util/filter).
     - from: dist-native/duckdb/darwin-${arch}/node_modules
       to: duckdb/node_modules
+    # node-pty for the built-in terminal (server/terminal/pty.ts), staged by
+    # prepare-node-pty. spawn-helper is a separate Mach-O, so it stays outside ASAR.
+    - from: dist-native/node-pty/darwin-${arch}/node_modules
+      to: node-pty/node_modules
   extendInfo:
     NSMicrophoneUsageDescription: OpenMausBot uses the microphone for voice dictation into the composer.
     NSSpeechRecognitionUsageDescription: OpenMausBot transcribes your voice on-device to type messages for you.
@@ -174,6 +178,8 @@ win:
       to: browser-engine
     - from: dist-native/duckdb/win32-x64/node_modules
       to: duckdb/node_modules
+    - from: dist-native/node-pty/win32-x64/node_modules
+      to: node-pty/node_modules
     # CUA driver and SDK for Windows — must live outside ASAR for native modules
     - from: dist-native/cua-win32-x64/cua-driver.exe
       to: cua-driver.exe
@@ -227,6 +233,8 @@ linux:
       to: browser-engine
     - from: dist-native/duckdb/linux-x64/node_modules
       to: duckdb/node_modules
+    - from: dist-native/node-pty/linux-x64/node_modules
+      to: node-pty/node_modules
     - from: build/linux-openmausbot-browser.apparmor
       to: openmausbot-browser.apparmor
   desktop:

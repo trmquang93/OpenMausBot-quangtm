@@ -92,6 +92,49 @@ describe("desktop browser package gate", () => {
   });
 });
 
+describe.skipIf(process.platform === "win32")("node-pty package gate", () => {
+  const pin = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).dependencies["node-pty"];
+
+  function withNodePty() {
+    const app = fixture();
+    const pkg = path.join(app.resources, "node-pty", "node_modules", "node-pty");
+    fs.mkdirSync(path.join(pkg, "lib"), { recursive: true });
+    fs.mkdirSync(path.join(pkg, "build", "Release"), { recursive: true });
+    fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "node-pty", version: pin }));
+    for (const name of ["index.js", "utils.js", "unixTerminal.js", "windowsTerminal.js"]) fs.writeFileSync(path.join(pkg, "lib", name), "");
+    fs.writeFileSync(path.join(pkg, "build", "Release", "pty.node"), "addon", { mode: 0o664 });
+    fs.chmodSync(path.join(pkg, "build", "Release", "pty.node"), 0o664);
+    return { ...app, pkg, addon: path.join(pkg, "build", "Release", "pty.node") };
+  }
+
+  it("repairs the addon's executable bit and accepts the pinned tree", async () => {
+    const { appOutDir, addon } = withNodePty();
+    await afterPack({ electronPlatformName: "linux", arch: 1, appOutDir });
+    expect(fs.lstatSync(addon).mode & 0o777).toBe(0o755);
+  });
+
+  it("rejects a tree at another version than the pin", async () => {
+    const { appOutDir, pkg } = withNodePty();
+    fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "node-pty", version: "0.0.1" }));
+    await expect(afterPack({ electronPlatformName: "linux", arch: 1, appOutDir })).rejects.toThrow(/package\.json pins/);
+  });
+
+  it("rejects an addon replaced by a symlink", async () => {
+    const { appOutDir, pkg, addon } = withNodePty();
+    fs.rmSync(addon);
+    fs.symlinkSync(path.join(pkg, "package.json"), addon);
+    await expect(afterPack({ electronPlatformName: "linux", arch: 1, appOutDir })).rejects.toThrow(/must be a regular file/);
+  });
+
+  it("rejects a tree whose root is a symlink", async () => {
+    const { appOutDir, resources } = withNodePty();
+    const replacement = path.join(appOutDir, "elsewhere");
+    fs.renameSync(path.join(resources, "node-pty"), replacement);
+    fs.symlinkSync(replacement, path.join(resources, "node-pty"), "dir");
+    await expect(afterPack({ electronPlatformName: "linux", arch: 1, appOutDir })).rejects.toThrow(/must be a real directory/);
+  });
+});
+
 // Real Mach-O fixtures: /usr/bin binaries are arm64e, not arm64, so compile.
 const canBuildMachO = process.platform === "darwin" && fs.existsSync("/usr/bin/lipo") &&
   spawnSync("cc", ["--version"]).status === 0;

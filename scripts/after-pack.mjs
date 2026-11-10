@@ -8,6 +8,7 @@ import {
 import { fileURLToPath } from "node:url";
 import { verifyBrowserBundle } from "./prepare-browser.mjs";
 import { pinnedDuckdbVersion, pinnedOnePasswordVersion, pinnedResvgVersion, verifyDuckdbTree } from "./prepare-duckdb.mjs";
+import { nativeFiles, pinnedNodePtyVersion, verifyNodePtyTree } from "./prepare-node-pty.mjs";
 import { LIPO_ARCH, isMachO, writeThinMachO } from "./mac-thin.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,6 +88,29 @@ async function validateDuckdb(resources, platform, arch, required) {
   await verifyDuckdbTree(duckdb, platform, arch, pinnedDuckdbVersion(root), pinnedResvgVersion(root), pinnedOnePasswordVersion(root));
 }
 
+// The PTY the built-in terminal spawns shells with (server/terminal/pty.ts):
+// the pinned package and this platform's native files only. electron-builder
+// copies with the executable bits it finds, and the Unix helper must keep them.
+async function validateNodePty(resources, platform, arch, required) {
+  const nodePty = path.join(resources, "node-pty");
+  const present = await lstat(nodePty).then(() => true, (error) => {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  });
+  if (!present && !required) return;
+  if (!arch) throw new Error(`Unsupported node-pty package architecture: ${arch}`);
+  const unixMode = platform === "win32" ? undefined : 0o755;
+  await requireRealDirectory(nodePty, unixMode);
+  const pkg = path.join(nodePty, "node_modules", "node-pty");
+  await requireRealDirectory(path.join(nodePty, "node_modules"), unixMode);
+  await requireRealDirectory(pkg, unixMode);
+  if (platform !== "win32") {
+    const { addons, helpers } = nativeFiles(platform, arch);
+    for (const file of [...addons, ...helpers]) await requireRegularFile(path.join(pkg, file), 0o755);
+  }
+  await verifyNodePtyTree(nodePty, platform, arch, pinnedNodePtyVersion(root));
+}
+
 // Google ships macOS Platform Tools universal, and the shared top-level
 // extraResources entry copies that tree into both single-arch apps. Keep only
 // this app's slice, before electron-builder signs the nested code.
@@ -130,6 +154,7 @@ export default async function afterPack(context) {
     await verifyBrowserBundle(browserRoot, `${context.electronPlatformName}-${arch}`);
   }
   await validateDuckdb(resources, context.electronPlatformName, arch, Boolean(context.packager));
+  await validateNodePty(resources, context.electronPlatformName, arch, Boolean(context.packager));
   if (context.electronPlatformName === "darwin") await thinMacPlatformTools(resources, arch);
 
   if (context.electronPlatformName !== "linux") return;
