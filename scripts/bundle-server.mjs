@@ -2,7 +2,7 @@
 // packaged app ships no node_modules. Entry points keep their exact relative
 // paths under dist-server, where the server locates each proxy by path.
 import { build } from "esbuild";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { serverLocalePlugin } from "./server-locale-plugin.mjs";
@@ -153,6 +153,13 @@ copyFileSync(join(root, "scripts", "desktop-server-entry.mjs"), join(root, "dist
 const catalogSnapshot = join(root, "dist-server", "model-catalog", "models-dev.snapshot.json");
 mkdirSync(dirname(catalogSnapshot), { recursive: true });
 copyFileSync(join(server, "model-catalog", "models-dev.snapshot.json"), catalogSnapshot);
+
+// Shells source these scripts from disk, so they cannot be inlined; the bundle looks for them under
+// terminal/shell-integration/ beside itself.
+const shellIntegration = join(server, "terminal", "shell-integration");
+const shellIntegrationDest = join(root, "dist-server", "terminal", "shell-integration");
+mkdirSync(shellIntegrationDest, { recursive: true });
+for (const name of readdirSync(shellIntegration)) copyFileSync(join(shellIntegration, name), join(shellIntegrationDest, name));
 
 // Pi loads this through its own jiti and supplies TypeBox. Inline our local
 // policy module so the extension also works without the source checkout;
