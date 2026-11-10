@@ -50,6 +50,7 @@ import { ThemeRow } from "./ThemeRow";
 import { ChatWidthRow, FontRow, SidebarToolsLayoutRow } from "./AppearanceSelectRows";
 import { RoomTurnTimeoutSettings } from "./RoomTurnTimeoutSettings";
 import { McpCallTimeoutSettings } from "./McpCallTimeoutSettings";
+import { TerminalSettings } from "./TerminalSettings";
 import { ProfileFields } from "./ProfileSettings";
 import { ThreadConcurrencySettings } from "./ThreadConcurrencySettings";
 import { AutomaticRecoverySettings } from "./AutomaticRecoverySettings";
@@ -372,6 +373,10 @@ export function SettingsModal() {
 
             <Card title={t("settings.mcpCalls.title")} subtitle={t("settings.mcpCalls.subtitle")}>
               <McpCallTimeoutSettings />
+            </Card>
+
+            <Card title={t("settings.terminal.title")} subtitle={t("settings.terminal.subtitle")}>
+              <TerminalSettings />
             </Card>
             <ThreadConcurrencySettings />
 
