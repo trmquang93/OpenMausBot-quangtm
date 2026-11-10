@@ -18,11 +18,6 @@ export const terminalPool: AppPool = createAppPool({ limit: TERMINAL_POOL_LIMIT 
 const heights = new Map<string, number>();
 const snapshots = new Map<string, string>();
 
-export function forgetTerminalRows(): void {
-  heights.clear();
-  snapshots.clear();
-}
-
 const clampHeight = (value: number) => Math.max(TERMINAL_HEIGHT.min, Math.min(TERMINAL_HEIGHT.max, Math.round(value)));
 
 function isTerminalPayload(value: unknown): value is TerminalPayload {

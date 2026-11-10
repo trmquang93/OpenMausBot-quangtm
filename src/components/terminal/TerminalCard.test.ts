@@ -57,7 +57,7 @@ vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit = vi.fn(); constructo
 vi.mock("@xterm/addon-web-links", () => ({ WebLinksAddon: class { constructor(handler: (event: unknown, uri: string) => void) { fake.linkHandlers.push(handler); } } }));
 
 import { createAppPool } from "../app/app-pool";
-import { TerminalCard, TERMINAL_POOL_LIMIT, forgetTerminalRows, terminalPool } from "./TerminalCard";
+import { TerminalCard, TERMINAL_POOL_LIMIT, terminalPool } from "./TerminalCard";
 import { TERMINAL_PASTE_CONFIRM_LINES, TERMINAL_RESIZE_DEBOUNCE_MS } from "./TerminalView";
 
 class FakeSocket {
@@ -80,7 +80,8 @@ class FakeSocket {
 const payload = (over: Partial<TerminalPayload> = {}): TerminalPayload => ({
   sessionId: "s1", title: "Build", cwd: "/work/projects/app/server", cols: 100, rows: 30, state: "running", ...over,
 });
-const row = (id: string, terminal: TerminalPayload | undefined): Message => ({ id, role: "bot", kind: "terminal", at: 1, ...(terminal ? { terminal } : {}) });
+let run = 0;
+const row = (id: string, terminal: TerminalPayload | undefined): Message => ({ id: `${id}:${run}`, role: "bot", kind: "terminal", at: 1, ...(terminal ? { terminal } : {}) });
 
 let container: HTMLDivElement;
 let root: Root;
@@ -117,7 +118,7 @@ beforeEach(() => {
   fake.linkHandlers = [];
   fake.opened = [];
   fake.api.mockReset();
-  forgetTerminalRows();
+  run += 1;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -153,7 +154,9 @@ describe("a running terminal", () => {
     expect(FakeSocket.all[0]!.url.endsWith(terminalSocketPath("t1", "s1"))).toBe(true);
     expect(fake.terms[0].options).toMatchObject({ cols: 100, rows: 30 });
     await act(async () => FakeSocket.all[0]!.open());
-    expect(FakeSocket.all[0]!.sent).toContainEqual({ t: "r", cols: 100, rows: 30 });
+    expect(FakeSocket.all[0]!.sent).toEqual([]);
+    await act(async () => FakeSocket.all[0]!.frame({ t: "s", state: "running", cols: 100, rows: 30 }));
+    expect(FakeSocket.all[0]!.sent).toEqual([{ t: "r", cols: 100, rows: 30 }]);
 
     await act(async () => FakeSocket.all[0]!.frame({ t: "o", seq: 0, data: "hello\r\n" }));
     expect(fake.terms[0].written).toEqual(["hello\r\n"]);
@@ -164,10 +167,24 @@ describe("a running terminal", () => {
     await enter();
     const socket = FakeSocket.all[0]!;
     await act(async () => socket.open());
+    await act(async () => socket.frame({ t: "s", state: "running", cols: 100, rows: 30 }));
     await act(async () => fake.terms[0].dataListener("ls\r"));
     await act(async () => fake.terms[0].resizeListener({ cols: 90, rows: 20 }));
     await act(async () => button("Stop")!.click());
     expect(socket.sent).toEqual(expect.arrayContaining([{ t: "i", data: "ls\r" }, { t: "r", cols: 90, rows: 20 }, { t: "c" }]));
+  });
+
+  it("sends nothing and takes no input when the server says the viewer only reads", async () => {
+    await render(row("m1", payload()));
+    await enter();
+    const socket = FakeSocket.all[0]!;
+    await act(async () => socket.open());
+    await act(async () => socket.frame({ t: "s", state: "running", cols: 100, rows: 30, readOnly: true }));
+    await act(async () => fake.terms[0].dataListener("ls\r"));
+    await act(async () => fake.terms[0].resizeListener({ cols: 90, rows: 20 }));
+    await act(async () => button("Stop")!.click());
+    expect(socket.sent).toEqual([]);
+    expect(fake.terms[0].options.disableStdin).toBe(true);
   });
 
   it("refits once after a burst of size changes", async () => {
@@ -291,10 +308,12 @@ describe("keyboard, clipboard and links", () => {
     await enter();
     const socket = FakeSocket.all[0]!;
     await act(async () => socket.open());
+    await act(async () => socket.frame({ t: "s", state: "running", cols: 100, rows: 30 }));
+    socket.sent.length = 0;
     return { socket, term: fake.terms[0] };
   }
 
-  it("copies a selection on Ctrl/Cmd+C and otherwise sends Ctrl+C", async () => {
+  it("copies a selection on Ctrl/Cmd+C and lets Ctrl+C reach the program", async () => {
     const { socket, term } = await mounted();
     term.selection = "picked";
     expect(term.keyHandler({ type: "keydown", key: "c", ctrlKey: true })).toBe(false);
@@ -303,9 +322,13 @@ describe("keyboard, clipboard and links", () => {
 
     expect(term.keyHandler({ type: "keydown", key: "c", ctrlKey: true })).toBe(true);
     expect(socket.sent.filter((frame) => frame.t === "i")).toEqual([]);
+  });
 
-    expect(term.keyHandler({ type: "keydown", key: "c", metaKey: true })).toBe(false);
-    expect(socket.sent).toContainEqual({ t: "i", data: "\x03" });
+  it("does not turn Cmd+C without a selection into Ctrl+C", async () => {
+    const { socket, term } = await mounted();
+    expect(term.keyHandler({ type: "keydown", key: "c", metaKey: true, ctrlKey: false })).toBe(false);
+    expect(term.keyHandler({ type: "keydown", key: "c", metaKey: false, ctrlKey: true })).toBe(true);
+    expect(socket.sent).toEqual([]);
   });
 
   it("leaves other Command shortcuts to the app", async () => {

@@ -1,7 +1,8 @@
 // What the terminal host needs from the server's own state, as the host's narrow dependencies.
 import type { ApprovalMode } from "../../shared/approval-mode.ts";
 import type { BotRecord, Store } from "../store.ts";
-import type { RequestAuth } from "../request-auth.ts";
+import { botOwner } from "../../shared/bot-owner.ts";
+import { ownerOrAdmin, type RequestAuth } from "../request-auth.ts";
 import type { Upgrades } from "../routes/upgrades.ts";
 import type { TerminalHostDeps } from "./routes.ts";
 import { terminalSettings } from "./settings.ts";
@@ -36,6 +37,12 @@ export function terminalDeps(w: TerminalWiring): TerminalHostDeps {
       return { roots, cwd: roots[0] ?? w.workspaceDir(botId) };
     },
     canSee: (auth, threadId) => w.visibleTo(w.viewerFor(auth)).thread(threadId),
+    canWrite: (auth, threadId) => {
+      if (ownerOrAdmin(auth)) return true;
+      const bot = store.botByThread(threadId);
+      const owner = bot ? botOwner(bot) : null;
+      return auth.kind === "session" && owner !== null && owner === auth.session.email?.trim().toLowerCase();
+    },
     live: (auth) => auth.kind === "loopback" || w.sessions.isLive(auth.session.id),
     threadLive: (botId, threadId) => {
       const task = store.taskByThread(botId, threadId);

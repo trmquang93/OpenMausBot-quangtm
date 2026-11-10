@@ -46,6 +46,7 @@ async function fixture() {
     patches: [] as Array<{ threadId: string; messageId: string; terminal: TerminalPayload }>,
     listeners: [] as Array<(change: StoreChange) => void>,
     threadsLive: true,
+    owner: true,
   };
   const upgrades = createUpgrades();
   const host = createTerminalHost({
@@ -57,6 +58,7 @@ async function fixture() {
     approval: () => state.approval,
     folders: () => ({ roots: [root], cwd: root }),
     canSee: (_auth, threadId) => state.visible.has(threadId),
+    canWrite: () => state.owner,
     live: () => state.live,
     threadLive: () => state.threadsLive,
     appendRow: (threadId, row) => { const added = { id: `msg-${state.rows.length + 1}`, threadId, terminal: row.terminal }; state.rows.push(added); return added; },
@@ -287,6 +289,31 @@ describe("a bot's calls", () => {
     expect(f.ptys[2]!.signals).toEqual(["SIGHUP"]);
   });
 
+  it("leaves a terminal running when only the conversation's active branch moves, and stops it once archived", async () => {
+    const f = await fixture();
+    await f.call(DIRECT, "open");
+    f.state.listeners.forEach((listener) => listener({ type: "thread", threadId: "thread-1", activeLeafId: "m9" }));
+    expect(f.ptys[0]!.signals).toEqual([]);
+    f.state.threadsLive = false;
+    f.state.listeners.forEach((listener) => listener({ type: "bot", botId: "bot-a" }));
+    expect(f.ptys[0]!.signals).toEqual(["SIGHUP"]);
+  });
+
+  it("keeps a secret the program printed out of the stored card and out of the patch", async () => {
+    const f = await fixture();
+    const { payload } = await f.call(DIRECT, "open");
+    const ghp = "ghp_abcdefghijklmnopqrstuvwxyz0123456789";
+    const anthropic = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz012345";
+    f.ptys[0]!.print(`token ${ghp} and ${anthropic}\r\n`);
+    f.ptys[0]!.end(0);
+    const stored = f.state.rows.find((row) => row.id === payload.message_id)!.terminal;
+    expect(stored.lastLines).toBe("token «redacted 40 chars» and «redacted 45 chars»");
+    for (const text of [JSON.stringify(stored), JSON.stringify(f.state.patches)]) {
+      expect(text).not.toContain(ghp);
+      expect(text).not.toContain(anthropic);
+    }
+  });
+
   it("marks the card of every running terminal as ended when the server shuts down", async () => {
     const f = await fixture();
     const { payload } = await f.call(DIRECT, "open");
@@ -335,6 +362,40 @@ describe("a person's terminal card", () => {
     await until(() => f.ptys[0]!.signals.length > 0);
     expect(f.ptys[0]!.signals).toEqual(["SIGHUP"]);
     expect(f.ptys[0]!.written).toEqual([]);
+  });
+
+  it("lets a person who only sees the conversation read, and closes the socket on the first frame that would write", async () => {
+    const f = await fixture();
+    const id = (await f.call(DIRECT, "open")).payload.session_id as string;
+    f.state.owner = false;
+    f.ptys[0]!.print("shared\r\n");
+    for (const frame of [{ t: "i", data: "rm -rf ~\r" }, { t: "r", cols: 20, rows: 5 }, { t: "c" }]) {
+      const view = f.socket("thread-1", id);
+      await view.opened;
+      await until(() => view.frames.length >= 2);
+      expect(view.frames[0]).toEqual({ t: "s", state: "running", cols: 120, rows: 30, readOnly: true });
+      expect(view.frames[1]).toEqual({ t: "o", seq: 0, data: "shared\r\n" });
+      view.ws.send(JSON.stringify(frame));
+      expect(await view.closed, frame.t).toBe(TERMINAL_CLOSE.readOnly);
+    }
+    expect(f.ptys[0]!.written).toEqual([]);
+    expect(f.ptys[0]!.resized).toEqual([]);
+    expect(f.ptys[0]!.signals).toEqual([]);
+
+    f.state.owner = true;
+    const owner = f.socket("thread-1", id);
+    await owner.opened;
+    await until(() => owner.frames.length >= 1);
+    expect(owner.frames[0]).toEqual({ t: "s", state: "running", cols: 120, rows: 30 });
+    owner.ws.send(JSON.stringify({ t: "i", data: "ls\r" }));
+    await until(() => f.ptys[0]!.written.length === 1);
+    expect(f.ptys[0]!.written).toEqual(["ls\r"]);
+  });
+
+  it("answers a malformed percent-encoding in the path with 404, not 500", async () => {
+    const f = await fixture();
+    expect((await f.http("GET", "/api/threads/%E0%A4%A/terminal/abc")).status).toBe(404);
+    expect((await f.http("POST", "/api/threads/%E0%A4%A/terminal/abc/restart")).status).toBe(404);
   });
 
   it("closes at once for a session that is not in that conversation, whatever the person can see", async () => {

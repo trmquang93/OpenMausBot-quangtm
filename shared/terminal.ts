@@ -89,12 +89,14 @@ export type TerminalClientFrame =
 /** Frames the server sends. `o.seq` is the byte offset of the first byte of `data` in the session's stream. */
 export type TerminalServerFrame =
   | { t: "o"; seq: number; data: string }
-  | { t: "s"; state: TerminalState; cols: number; rows: number; exitCode?: number }
+  | { t: "s"; state: TerminalState; cols: number; rows: number; exitCode?: number; readOnly?: true }
   | { t: "x"; code: number };
 
-/** Close codes of the session WebSocket. */
+/** Close codes of the session WebSocket. `readOnly`: a person who may see the conversation but does not own it sent an
+ * `i`, `r` or `c` frame; the `s` frame already carried `readOnly: true`, so a client that honours it never sends one. */
 export const TERMINAL_CLOSE = {
   ended: 4000,
+  readOnly: 4003,
   unavailable: 4004,
 } as const;
 

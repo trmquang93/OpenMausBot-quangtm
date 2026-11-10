@@ -48,6 +48,8 @@ export interface TerminalHostDeps {
   /** Where a terminal may start: the allowed roots and the folder it starts in by default. */
   folders(botId: string, threadId: string): { roots: string[]; cwd: string };
   canSee(auth: RequestAuth, threadId: string): boolean;
+  /** The person owns the conversation, so their keystrokes, resizes and Stop reach the shell; anyone else who sees it only reads. */
+  canWrite(auth: RequestAuth, threadId: string): boolean;
   /** The person's sign-in is still valid. */
   live(auth: RequestAuth): boolean;
   /** Whether the conversation still exists and is not archived. */
@@ -107,7 +109,7 @@ export function createTerminalHost(deps: TerminalHostDeps): TerminalHost {
     const row = rows.get(info.id);
     if (!row) return;
     rows.delete(info.id);
-    const terminal: TerminalPayload = { ...row.payload, state: "exited", ...(info.exitCode === undefined ? {} : { exitCode: info.exitCode }), ...(lastOutput ? { lastLines: lastOutput } : {}) };
+    const terminal: TerminalPayload = { ...row.payload, state: "exited", ...(info.exitCode === undefined ? {} : { exitCode: info.exitCode }), ...(lastOutput ? { lastLines: redactSecretsInText(lastOutput) } : {}) };
     try { deps.patchRow(row.threadId, row.messageId, { terminal }); } catch {}
   }
 
@@ -221,7 +223,7 @@ export function createTerminalHost(deps: TerminalHostDeps): TerminalHost {
     });
     if (!attached) { ws.close(TERMINAL_CLOSE.unavailable, "unavailable"); return; }
     const { info, snapshot } = attached;
-    send({ t: "s", state: info.state, cols: info.cols, rows: info.rows, ...(info.exitCode === undefined ? {} : { exitCode: info.exitCode }) });
+    send({ t: "s", state: info.state, cols: info.cols, rows: info.rows, ...(info.exitCode === undefined ? {} : { exitCode: info.exitCode }), ...(deps.canWrite(auth, threadId) ? {} : { readOnly: true }) });
     if (snapshot.data) send({ t: "o", seq: snapshot.seq, data: (snapshot.omitted > 0 ? OMITTED_MARKER : "") + snapshot.data });
     if (info.state === "exited") { send({ t: "x", code: info.exitCode ?? 0 }); ws.close(TERMINAL_CLOSE.ended, "ended"); }
     let alive = true;
@@ -236,6 +238,7 @@ export function createTerminalHost(deps: TerminalHostDeps): TerminalHost {
       let frame: TerminalClientFrame;
       try { frame = JSON.parse(String(data)) as TerminalClientFrame; } catch { return; }
       if (!isRecord(frame)) return;
+      if ((frame.t === "i" || frame.t === "r" || frame.t === "c") && !deps.canWrite(auth, threadId)) { ws.close(TERMINAL_CLOSE.readOnly, "read only"); return; }
       if (frame.t === "i" && typeof frame.data === "string") manager.type(threadId, sessionId, frame.data);
       else if (frame.t === "r" && typeof frame.cols === "number" && typeof frame.rows === "number") manager.resize(threadId, sessionId, frame.cols, frame.rows);
       else if (frame.t === "c") manager.stopFromPerson(threadId, sessionId);
@@ -248,7 +251,8 @@ export function createTerminalHost(deps: TerminalHostDeps): TerminalHost {
     const stream = restart ? null : STREAM.exec(path);
     const match = restart ?? stream;
     if (!match) return PASS;
-    const threadId = decodeURIComponent(match[1]!);
+    let threadId: string;
+    try { threadId = decodeURIComponent(match[1]!); } catch { return void json(res, 404, { error: "no such conversation" }); }
     const sessionId = match[2]!;
     res.setHeader("cache-control", "no-store");
     if (!isSameOrigin(req)) return void json(res, 403, { error: "forbidden: cross-origin request" });

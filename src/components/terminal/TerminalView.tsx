@@ -88,6 +88,7 @@ export function TerminalView(props: TerminalViewProps) {
   const host = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const writable = useRef(false);
   const latest = useRef(props);
   latest.current = props;
   const [connection, setConnection] = useState<Connection>("connecting");
@@ -100,7 +101,7 @@ export function TerminalView(props: TerminalViewProps) {
     },
     stop() {
       const socket = socketRef.current;
-      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ t: "c" } satisfies TerminalClientFrame));
+      if (socket?.readyState === WebSocket.OPEN && writable.current) socket.send(JSON.stringify({ t: "c" } satisfies TerminalClientFrame));
     },
     focus() {
       termRef.current?.focus();
@@ -112,6 +113,7 @@ export function TerminalView(props: TerminalViewProps) {
     if (!element) return;
     let disposed = false;
     let cleanup = () => {};
+    writable.current = false;
     setConnection("connecting");
 
     void (async () => {
@@ -137,7 +139,7 @@ export function TerminalView(props: TerminalViewProps) {
 
       const send = (frame: TerminalClientFrame) => {
         const socket = socketRef.current;
-        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(frame));
+        if (socket?.readyState === WebSocket.OPEN && writable.current) socket.send(JSON.stringify(frame));
       };
 
       term.attachCustomKeyEventHandler((event) => {
@@ -150,11 +152,7 @@ export function TerminalView(props: TerminalViewProps) {
             term.clearSelection();
             return false;
           }
-          if (event.metaKey) {
-            send({ t: "i", data: "\x03" });
-            return false;
-          }
-          return true;
+          return event.ctrlKey;
         }
         if (modified && key === "v") return false;
         // Command shortcuts belong to the app, not to the program in the terminal.
@@ -191,14 +189,17 @@ export function TerminalView(props: TerminalViewProps) {
         if (disposed) return;
         setConnection("live");
         fit.fit();
-        send({ t: "r", cols: term.cols, rows: term.rows });
       };
       socket.onmessage = (event) => {
         const frame = parseFrame(event.data);
         if (!frame || disposed) return;
         if (frame.t === "o") term.write(frame.data);
-        else if (frame.t === "s") latest.current.onStatus({ state: frame.state, ...(frame.exitCode !== undefined ? { exitCode: frame.exitCode } : {}) });
-        else {
+        else if (frame.t === "s") {
+          writable.current = frame.readOnly !== true;
+          term.options.disableStdin = !writable.current;
+          latest.current.onStatus({ state: frame.state, ...(frame.exitCode !== undefined ? { exitCode: frame.exitCode } : {}) });
+          send({ t: "r", cols: term.cols, rows: term.rows });
+        } else {
           reportedExit = true;
           latest.current.onStatus({ state: "exited", exitCode: frame.code });
         }

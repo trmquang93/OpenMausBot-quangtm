@@ -335,10 +335,7 @@ kiểm tra quyền sở hữu ở **mọi** thao tác, không chỉ lúc mở:
 - `botId`/`threadId` của caller lấy từ **danh tính tool call đã xác thực** trong context
   `agents-call.ts`, **không bao giờ** lấy từ tham số do LLM gửi lên. Nếu không, bot chỉ cần gửi
   `thread_id` khác là chiếm phiên.
-- Không có endpoint công khai nào mở terminal. Chỉ một WebSocket UI đã xác thực
-  (`/api/threads/:threadId/terminal/:sessionId`); handshake kiểm tra session thuộc thread trong đường
-  dẫn **và** người dùng có quyền xem thread đó (`threadVisible`, như SSE hiện có). Không có route HTTP
-  để đọc/ghi nội dung terminal, không có bản JSON, không có `hub`-style attach, không có listener.
+- Không có endpoint công khai nào mở terminal. Chỉ có hai đường vào, cả hai đều không trả nội dung: (a) một WebSocket UI đã xác thực (`/api/threads/:threadId/terminal/:sessionId`) mang byte vào/ra; (b) một POST `/restart` trên đúng đường dẫn đó, chỉ dựng lại một phiên đã thoát từ chính card của nó — same-origin, người dùng phải thấy thread, session phải thuộc thread, thread phải ở Full access và không phải room, và response chỉ có metadata (sessionId, title, cwd, cols, rows, state), không có byte output. Handshake WebSocket kiểm tra session thuộc thread trong đường dẫn **và** người dùng có quyền xem thread đó (`threadVisible`, như SSE hiện có); frame ghi (`i`/`r`/`c`) chỉ nhận từ chủ thread, người xem read-only chỉ đọc. Không có route HTTP đọc/ghi nội dung terminal, không có bản JSON, không có `hub`-style attach, không có listener.
 - Người dùng chỉ điều khiển qua card: input UI gắn với `(threadId, sessionId)` họ đang xem; không có ô
   nhập session id để vào phiên của thread khác.
 - Không thêm token riêng, API key hay kênh IPC cho "tool ngoài", vì không có tool ngoài hợp lệ.
